@@ -28,7 +28,7 @@ from typing import Dict, List, Optional, Set
 
 try:
     import nfc_reader
-    import nfc_native
+    import nfc_native  # Still needed for selectNextTag
 except ImportError as e:
     print("Error: nfc_reader module not found!")
     print("Please build the Python extension first:")
@@ -131,17 +131,17 @@ class MultiTagMonitor:
         
         self.last_display_lines = len(lines)
     
-    def scan_tags(self):
-        """Scan for all tags currently in range."""
+    def scan_tags(self, reader):
+        """Scan for all tags currently in range using the reader instance."""
         current_scan = {}
         
         try:
             # Check if any tags are present
-            if not nfc_native.is_tag_present():
+            if not reader.is_tag_present():
                 return current_scan
             
             # Get total count
-            num_tags = nfc_native.get_num_tags()
+            num_tags = reader.get_num_tags()
             if num_tags <= 0:
                 return current_scan
             
@@ -149,7 +149,7 @@ class MultiTagMonitor:
             for tag_index in range(num_tags):
                 try:
                     # Get current tag info
-                    tag_info = nfc_native.get_tag_info()
+                    tag_info = reader.get_tag_info()
                     if tag_info and isinstance(tag_info, dict):
                         uid = tag_info.get('uid', 'Unknown')
                         
@@ -165,7 +165,7 @@ class MultiTagMonitor:
                             
                             # Try to read text content
                             try:
-                                text_data = nfc_native.read_text()
+                                text_data = reader.read_text()
                                 if text_data and text_data.get('text'):
                                     tag_data['text'] = text_data['text']
                                     tag_data['language'] = text_data.get('language', 'unknown')
@@ -243,61 +243,50 @@ class MultiTagMonitor:
         print("\nInitializing NFC...")
         
         try:
-            # Initialize NFC
-            success = nfc_native.initialize()
-            if not success:
-                print("❌ NFC initialization failed")
-                print("Make sure you're running as root and NFC hardware is connected")
-                return False
-            
-            print("✅ NFC initialized successfully")
-            
-            # Start discovery
-            nfc_native.start_discovery()
-            print("✅ Discovery started")
-            print(f"🔄 Refresh rate: {int(self.refresh_rate * 1000)}ms")
-            
-            print("\n" * 3)  # Initial spacing for display
-            
-            # Main monitoring loop
-            while self.running:
-                try:
-                    # Scan for current tags
-                    scanned_tags = self.scan_tags()
-                    
-                    # Update tag list and detect changes
-                    self.update_tag_list(scanned_tags)
-                    
-                    # Clear previous display and show current status
-                    self.clear_display()
-                    self.display_status()
-                    
-                    # Wait before next refresh
-                    time.sleep(self.refresh_rate)
+            # Use NFCReader context manager like the working tests
+            with nfc_reader.NFCReader() as reader:
+                reader.start_discovery()
                 
-                except KeyboardInterrupt:
-                    # Handled by signal handler
-                    break
-                except Exception as e:
-                    # Log errors but continue monitoring
-                    print(f"\n❌ Monitor error: {e}")
-                    time.sleep(self.refresh_rate * 2)  # Longer pause on error
-            
-            return True
+                print("✅ NFC initialized and discovery started")
+                print(f"🔄 Refresh rate: {int(self.refresh_rate * 1000)}ms")
+                
+                print("\n" * 3)  # Initial spacing for display
+                
+                # Main monitoring loop
+                while self.running:
+                    try:
+                        # Scan for current tags using the reader
+                        scanned_tags = self.scan_tags(reader)
+                        
+                        # Update tag list and detect changes
+                        self.update_tag_list(scanned_tags)
+                        
+                        # Clear previous display and show current status
+                        self.clear_display()
+                        self.display_status()
+                        
+                        # Wait before next refresh
+                        time.sleep(self.refresh_rate)
+                    
+                    except KeyboardInterrupt:
+                        # Handled by signal handler
+                        break
+                    except Exception as e:
+                        # Log errors but continue monitoring
+                        print(f"\n❌ Monitor error: {e}")
+                        time.sleep(self.refresh_rate * 2)  # Longer pause on error
+                
+                return True
         
+        except nfc_reader.NFCInitializationError as e:
+            print(f"❌ NFC initialization failed: {e}")
+            print("Make sure you're running as root and NFC hardware is connected")
+            return False
         except Exception as e:
             print(f"❌ Fatal error: {e}")
             return False
         
         finally:
-            # Cleanup
-            try:
-                nfc_native.stop_discovery()
-                nfc_native.deinitialize()
-                print("\n✅ NFC cleanup completed")
-            except:
-                pass
-            
             # Final summary
             print(f"\n📊 Final Session Summary:")
             print(f"   Total tags detected: {self.total_detected}")
