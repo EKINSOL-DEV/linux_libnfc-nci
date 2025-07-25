@@ -150,7 +150,11 @@ void ConfigFile::parseFromString(const std::string& config) {
     if (line.at(0) == 0) continue;
 
     auto search = line.find('=');
-    CHECK(search != string::npos);
+    if (search == string::npos) {
+      // Skip lines without '=' (e.g., parts of multi-line values)
+      LOG(WARNING) << "ConfigFile - Skipping line without '=': " << line;
+      continue;
+    }
 
     string key(Trim(line.substr(0, search)));
     string value_string(Trim(line.substr(search + 1, string::npos)));
