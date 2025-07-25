@@ -23,6 +23,11 @@ The Python interface provides a simple way to:
 - `multi_tag_demo.py` - Demo script for multi-tag detection and reading (with fallback)
 - `nfc_multi_tag_enhanced.py` - Enhanced multi-tag demo with hardware adaptation
 - `nfc_multi_tag_diagnostic.py` - Diagnostic tool for multi-tag hardware capabilities
+- `nfc_simple_multi_tag.py` - Simple user-guided multi-tag collection (reliable with any hardware)
+- `nfc_workaround_multi_tag.py` - Multi-tag workaround for getNumTags() limitations
+- `nfc_debug_api.py` - Low-level API debugging tool for testing core NFC functions
+- `nfc_pn7160_multi_tag.py` - **PN7160-optimized multi-tag detection using anti-collision**
+- `nfc_pn7160_fast_switch.py` - **PN7160 fast tag switching performance optimization tool**
 - `nfc_monitor_demo.py` - Real-time monitoring demo
 - `build.sh` - Build script to compile the extension
 - `README.md` - This file
@@ -247,6 +252,27 @@ sudo python nfc_multi_tag_enhanced.py --mode sequential --min-tags 3
 
 # Multi-tag hardware diagnostic
 sudo python nfc_multi_tag_diagnostic.py
+
+# Simple user-guided multi-tag collection (works with any hardware)
+sudo python nfc_simple_multi_tag.py --tags 3
+
+# Multi-tag workaround for getNumTags() limitations
+sudo python nfc_workaround_multi_tag.py --mode rapid --target-tags 3
+```
+
+### PN7160 NFC Controllers (Anti-Collision Support)
+
+For **PN7160 NFC controllers** that support anti-collision mechanisms:
+
+```bash
+# PN7160-optimized multi-tag detection using anti-collision
+sudo python nfc_pn7160_multi_tag.py --max-tags 5 --timeout 30
+
+# PN7160 fast tag switching performance test
+sudo python nfc_pn7160_fast_switch.py --min-tags 3 --cycles 20
+
+# PN7160 discovery only (skip switching test)
+sudo python nfc_pn7160_multi_tag.py --max-tags 5 --no-switching
 ```
 
 ### Continuous Monitoring Demo
@@ -407,6 +433,7 @@ ls -la ../libnfc_nci_linux.so
    - Try the enhanced demo: `sudo python nfc_multi_tag_enhanced.py --mode auto`
    - Use sequential detection as fallback: place tags one at a time quickly
    - Check if getNumTags() returns values > 1 with debug logging enabled
+   - **For PN7160 controllers**: Use `sudo python nfc_pn7160_multi_tag.py` for anti-collision support
 
 ### Writing Safety
 
@@ -425,6 +452,40 @@ The interface currently supports:
 - Various NFC tag technologies (Type A, Type B, Type F, etc.)
 - Mifare Classic, Mifare Ultralight
 - ISO14443-4 tags
+
+## PN7160 NFC Controller Support
+
+For **PN7160 NFC controllers**, this library provides enhanced multi-tag capabilities:
+
+### Anti-Collision Multi-Tag Detection
+The PN7160 supports **anti-collision mechanisms** that allow detection of multiple tags sequentially during a single discovery phase:
+
+- **Discovery Phase Capture**: Multiple `RF_DISCOVER_NTF` notifications are captured during anti-collision
+- **Sequential Tag Switching**: Use `selectNextTag()` to cycle through detected tags
+- **High-Speed Operations**: Optimized for inventory management and rapid scanning applications
+
+### Key PN7160 Features
+- **Anti-collision detection**: Hardware automatically discovers multiple tag UIDs
+- **Sequential switching**: Switch between detected tags using `selectNextTag()`
+- **Performance optimization**: Achieve 5+ operations/second with proper tuning
+- **Discovery notification handling**: Capture multiple tags during single discovery cycle
+
+### PN7160 vs Generic Multi-Tag Support
+
+| Feature | Generic NFC Hardware | PN7160 with Anti-Collision |
+|---------|---------------------|----------------------------|
+| Multi-tag method | User-guided sequential | Hardware anti-collision |
+| Detection speed | Manual tag placement | Automatic discovery |
+| Switching capability | Limited/manual | Native selectNextTag() |
+| Max throughput | 1-2 ops/sec | 5+ ops/sec |
+| Reliability | Depends on user timing | Hardware-managed |
+
+### PN7160 Usage Recommendations
+
+1. **For multi-tag detection**: Use `nfc_pn7160_multi_tag.py` instead of generic tools
+2. **For high-speed applications**: Use `nfc_pn7160_fast_switch.py` for performance testing
+3. **For inventory systems**: Leverage anti-collision for rapid tag scanning
+4. **For debugging**: Monitor `mNumDiscNtf` counter and discovery notifications
 
 ## Performance Notes
 
