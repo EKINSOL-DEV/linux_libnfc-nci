@@ -88,6 +88,33 @@ if tag_data:
     print(f"Text: {tag_data.get('text', 'No text found')}")
 ```
 
+### Multi-Tag Support
+
+```python
+import nfc_reader
+
+# Read from multiple tags simultaneously
+tags = nfc_reader.read_multiple_tags(min_tags=2, timeout=30)
+if tags:
+    print(f"Found {len(tags)} tags:")
+    for i, tag in enumerate(tags):
+        print(f"  Tag {i+1}: '{tag['text']}' (UID: {tag['uid']})")
+
+# Get info for all detected tags
+all_tags = nfc_reader.get_all_tag_info(timeout=10)
+if all_tags:
+    for tag in all_tags:
+        print(f"UID: {tag['uid']}, Tech: {tag['technology_name']}")
+
+# Monitor multiple tags continuously
+def on_tags_changed(tags):
+    print(f"Tags changed: {len(tags)} detected")
+    for tag in tags:
+        print(f"  {tag.get('text', 'No text')}")
+
+nfc_reader.monitor_multiple_tags(callback=on_tags_changed)
+```
+
 ### Context Manager (Recommended)
 
 ```python
@@ -103,11 +130,30 @@ with nfc_reader.NFCReader() as reader:
     if reader.is_tag_present():
         tag_info = reader.get_tag_info()
         print(f"Tag UID: {tag_info['uid']}")
+
+# Multi-tag context manager usage
+with nfc_reader.NFCReader() as reader:
+    # Wait for multiple tags
+    tags = reader.wait_for_multiple_tags(min_tags=2, timeout=30)
+    if tags:
+        print(f"Found {len(tags)} tags with text")
+        
+    # Check how many tags are present
+    num_tags = reader.get_num_tags()
+    print(f"Total tags detected: {num_tags}")
+    
+    # Get all tag information
+    all_tags = reader.get_all_tags_info()
+    if all_tags:
+        for i, tag in enumerate(all_tags):
+            print(f"Tag {i}: {tag['technology_name']}")
 ```
 
 ## Examples
 
-Run the example script to see different usage patterns:
+Run the example scripts to see different usage patterns:
+
+### Single Tag Examples
 
 ```bash
 # Simple text reading
@@ -123,25 +169,68 @@ sudo python example_text_reader.py --advanced
 sudo python example_text_reader.py --errors
 ```
 
+### Multi-Tag Examples
+
+```bash
+# Simple multi-tag detection
+sudo python multi_tag_demo.py --mode simple
+
+# Continuous multi-tag monitoring
+sudo python multi_tag_demo.py --mode monitor
+
+# Detailed analysis of each tag
+sudo python multi_tag_demo.py --mode detailed
+
+# Interactive tag selection
+sudo python multi_tag_demo.py --mode interactive
+```
+
+### Continuous Monitoring Demo
+
+```bash
+# Real-time single tag monitoring with detection/removal events
+sudo python nfc_monitor_demo.py
+
+# Simple status mode
+sudo python nfc_monitor_demo.py --simple
+```
+
 ## API Reference
 
 ### High-level Functions
 
+#### Single Tag Functions
 - `read_text_from_tag(timeout=30)` - Simple text reading, returns string or None
 - `read_text_with_language(timeout=30)` - Returns dict with text and language
 - `get_tag_data(timeout=30)` - Returns comprehensive tag information
 
+#### Multi-Tag Functions
+- `read_multiple_tags(min_tags=2, timeout=30)` - Read from multiple tags simultaneously
+- `get_all_tag_info(timeout=10)` - Get information for all detected tags
+- `monitor_multiple_tags(callback=None, min_tags=1)` - Continuous multi-tag monitoring
+
 ### NFCReader Class
 
+#### Basic Methods
 - `NFCReader(auto_cleanup=True)` - Main class for NFC operations
 - `initialize()` - Initialize NFC stack
 - `cleanup()` - Clean up resources
 - `start_discovery()` - Start tag discovery
 - `stop_discovery()` - Stop tag discovery
+
+#### Single Tag Methods
 - `is_tag_present()` - Check if tag is present
 - `read_text()` - Read text from current tag
 - `get_tag_info()` - Get tag information
 - `wait_for_tag(timeout=30)` - Wait for tag and read text
+
+#### Multi-Tag Methods
+- `get_num_tags()` - Get number of detected tags
+- `select_next_tag()` - Select next tag in field
+- `check_next_protocol()` - Check next valid protocol
+- `read_all_text()` - Read text from all detected tags
+- `get_all_tags_info()` - Get info for all detected tags
+- `wait_for_multiple_tags(min_tags=2, timeout=30)` - Wait for multiple tags
 
 ### Low-level Functions
 

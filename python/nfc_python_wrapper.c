@@ -22,6 +22,7 @@
 #include "linux_nfc_api.h"
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 
 static int nfc_initialized = 0;
 static char* last_text_found = NULL;
@@ -247,6 +248,178 @@ static PyObject* py_nfc_get_tag_info(PyObject* self, PyObject* args) {
     return result;
 }
 
+// Get number of detected tags
+static PyObject* py_nfc_get_num_tags(PyObject* self, PyObject* args) {
+    if (!nfc_initialized) {
+        PyErr_SetString(PyExc_RuntimeError, "NFC not initialized");
+        return NULL;
+    }
+    
+    int num_tags = getNumTags();
+    return PyLong_FromLong(num_tags);
+}
+
+// Select next tag in the field
+static PyObject* py_nfc_select_next_tag(PyObject* self, PyObject* args) {
+    if (!nfc_initialized) {
+        PyErr_SetString(PyExc_RuntimeError, "NFC not initialized");
+        return NULL;
+    }
+    
+    int result = selectNextTag();
+    if (result == 0) {
+        Py_RETURN_TRUE;
+    }
+    Py_RETURN_FALSE;
+}
+
+// Check next valid protocol
+static PyObject* py_nfc_check_next_protocol(PyObject* self, PyObject* args) {
+    if (!nfc_initialized) {
+        PyErr_SetString(PyExc_RuntimeError, "NFC not initialized");
+        return NULL;
+    }
+    
+    int protocol_index = checkNextProtocol();
+    return PyLong_FromLong(protocol_index);
+}
+
+// Read text from all detected tags
+static PyObject* py_nfc_read_all_text(PyObject* self, PyObject* args) {
+    if (!nfc_initialized) {
+        PyErr_SetString(PyExc_RuntimeError, "NFC not initialized");
+        return NULL;
+    }
+    
+    int num_tags = getNumTags();
+    if (num_tags <= 0) {
+        Py_RETURN_NONE;
+    }
+    
+    PyObject* tag_list = PyList_New(0);
+    if (!tag_list) {
+        return NULL;
+    }
+    
+    // Store original tag state
+    int original_tag_detected = tag_detected;
+    nfc_tag_info_t original_tag_info;
+    if (tag_detected) {
+        memcpy(&original_tag_info, &detected_tag_info, sizeof(nfc_tag_info_t));
+    }
+    
+    // Read from each tag
+    for (int i = 0; i < num_tags; i++) {
+        PyObject* tag_data = PyDict_New();
+        if (!tag_data) {
+            Py_DECREF(tag_list);
+            return NULL;
+        }
+        
+        // Add tag index
+        PyDict_SetItemString(tag_data, "tag_index", PyLong_FromLong(i));
+        
+        // Get text from current tag
+        PyObject* text_result = py_nfc_read_text(self, args);
+        if (text_result && text_result != Py_None) {
+            // Merge text data into tag_data
+            if (PyDict_Check(text_result)) {
+                PyObject* key, *value;
+                Py_ssize_t pos = 0;
+                while (PyDict_Next(text_result, &pos, &key, &value)) {
+                    PyDict_SetItem(tag_data, key, value);
+                }
+            }
+        }
+        Py_XDECREF(text_result);
+        
+        // Get tag info
+        PyObject* info_result = py_nfc_get_tag_info(self, args);
+        if (info_result && info_result != Py_None) {
+            // Merge tag info into tag_data
+            if (PyDict_Check(info_result)) {
+                PyObject* key, *value;
+                Py_ssize_t pos = 0;
+                while (PyDict_Next(info_result, &pos, &key, &value)) {
+                    PyDict_SetItem(tag_data, key, value);
+                }
+            }
+        }
+        Py_XDECREF(info_result);
+        
+        PyList_Append(tag_list, tag_data);
+        Py_DECREF(tag_data);
+        
+        // Select next tag if not the last one
+        if (i < num_tags - 1) {
+            selectNextTag();
+            // Small delay to allow tag switch
+            struct timespec ts = {0, 50000000}; // 50ms
+            nanosleep(&ts, NULL);
+        }
+    }
+    
+    // Restore original tag state if possible
+    if (original_tag_detected) {
+        tag_detected = original_tag_detected;
+        memcpy(&detected_tag_info, &original_tag_info, sizeof(nfc_tag_info_t));
+    }
+    
+    return tag_list;
+}
+
+// Get information for all detected tags
+static PyObject* py_nfc_get_all_tags_info(PyObject* self, PyObject* args) {
+    if (!nfc_initialized) {
+        PyErr_SetString(PyExc_RuntimeError, "NFC not initialized");
+        return NULL;
+    }
+    
+    int num_tags = getNumTags();
+    if (num_tags <= 0) {
+        Py_RETURN_NONE;
+    }
+    
+    PyObject* tag_list = PyList_New(0);
+    if (!tag_list) {
+        return NULL;
+    }
+    
+    // Store original tag state
+    int original_tag_detected = tag_detected;
+    nfc_tag_info_t original_tag_info;
+    if (tag_detected) {
+        memcpy(&original_tag_info, &detected_tag_info, sizeof(nfc_tag_info_t));
+    }
+    
+    // Read info from each tag
+    for (int i = 0; i < num_tags; i++) {
+        PyObject* tag_info = py_nfc_get_tag_info(self, args);
+        if (tag_info && tag_info != Py_None) {
+            // Add tag index
+            PyDict_SetItemString(tag_info, "tag_index", PyLong_FromLong(i));
+            PyList_Append(tag_list, tag_info);
+        }
+        Py_XDECREF(tag_info);
+        
+        // Select next tag if not the last one
+        if (i < num_tags - 1) {
+            selectNextTag();
+            // Small delay to allow tag switch
+            struct timespec ts = {0, 50000000}; // 50ms
+            nanosleep(&ts, NULL);
+        }
+    }
+    
+    // Restore original tag state if possible
+    if (original_tag_detected) {
+        tag_detected = original_tag_detected;
+        memcpy(&detected_tag_info, &original_tag_info, sizeof(nfc_tag_info_t));
+    }
+    
+    return tag_list;
+}
+
 // Method definitions
 static PyMethodDef NFCMethods[] = {
     {"initialize", py_nfc_initialize, METH_NOARGS, "Initialize NFC stack"},
@@ -256,6 +429,11 @@ static PyMethodDef NFCMethods[] = {
     {"is_tag_present", py_nfc_is_tag_present, METH_NOARGS, "Check if tag is present"},
     {"read_text", py_nfc_read_text, METH_NOARGS, "Read text from NDEF tag"},
     {"get_tag_info", py_nfc_get_tag_info, METH_NOARGS, "Get tag information"},
+    {"get_num_tags", py_nfc_get_num_tags, METH_NOARGS, "Get number of detected tags"},
+    {"select_next_tag", py_nfc_select_next_tag, METH_NOARGS, "Select next tag in field"},
+    {"check_next_protocol", py_nfc_check_next_protocol, METH_NOARGS, "Check next valid protocol"},
+    {"read_all_text", py_nfc_read_all_text, METH_NOARGS, "Read text from all detected tags"},
+    {"get_all_tags_info", py_nfc_get_all_tags_info, METH_NOARGS, "Get info for all detected tags"},
     {NULL, NULL, 0, NULL}
 };
 

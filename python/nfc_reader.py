@@ -28,7 +28,7 @@ Requirements:
 
 import time
 import threading
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any, Union, List
 import logging
 
 try:
@@ -195,6 +195,140 @@ class NFCReader:
             logger.error(f"Error getting tag info: {e}")
             return None
     
+    def get_num_tags(self) -> int:
+        """
+        Get the number of currently detected tags.
+        
+        Returns:
+            int: Number of detected tags, 0 if none detected
+        """
+        if not self._initialized:
+            return 0
+        
+        try:
+            return nfc_native.get_num_tags()
+        except Exception as e:
+            logger.error(f"Error getting number of tags: {e}")
+            return 0
+    
+    def select_next_tag(self) -> bool:
+        """
+        Select the next tag in the field (for multi-tag scenarios).
+        
+        Returns:
+            bool: True if successfully selected next tag, False otherwise
+        """
+        if not self._initialized:
+            logger.error("NFC not initialized")
+            return False
+        
+        try:
+            return nfc_native.select_next_tag()
+        except Exception as e:
+            logger.error(f"Error selecting next tag: {e}")
+            return False
+    
+    def check_next_protocol(self) -> int:
+        """
+        Check the next valid protocol index.
+        
+        Returns:
+            int: Index of next tag protocol, -1 if no valid index
+        """
+        if not self._initialized:
+            return -1
+        
+        try:
+            return nfc_native.check_next_protocol()
+        except Exception as e:
+            logger.error(f"Error checking next protocol: {e}")
+            return -1
+    
+    def read_all_text(self) -> Optional[List[Dict[str, Any]]]:
+        """
+        Read text from all detected tags.
+        
+        Returns:
+            list: List of dictionaries with text data from each tag, or None if no tags
+        """
+        if not self._initialized:
+            logger.error("NFC not initialized")
+            return None
+        
+        try:
+            result = nfc_native.read_all_text()
+            if result is None:
+                return None
+            
+            # Filter out tags without text
+            text_tags = []
+            for tag in result:
+                if tag.get('text'):
+                    text_tags.append(tag)
+            
+            return text_tags if text_tags else None
+        except Exception as e:
+            logger.error(f"Error reading all text: {e}")
+            return None
+    
+    def get_all_tags_info(self) -> Optional[List[Dict[str, Any]]]:
+        """
+        Get information for all detected tags.
+        
+        Returns:
+            list: List of tag information dictionaries, or None if no tags
+        """
+        if not self._initialized:
+            return None
+        
+        try:
+            return nfc_native.get_all_tags_info()
+        except Exception as e:
+            logger.error(f"Error getting all tags info: {e}")
+            return None
+    
+    def wait_for_multiple_tags(self, min_tags: int = 2, timeout: float = 30.0, 
+                             check_interval: float = 0.1) -> Optional[List[Dict[str, Any]]]:
+        """
+        Wait for multiple NFC tags and read data from all of them.
+        
+        Args:
+            min_tags: Minimum number of tags to wait for
+            timeout: Maximum time to wait for tags (seconds)
+            check_interval: How often to check for tags (seconds)
+            
+        Returns:
+            list: List of tag data if found, None if timeout or insufficient tags
+        """
+        if not self._initialized:
+            self.initialize()
+        
+        if not self.discovery_active:
+            self.start_discovery()
+        
+        start_time = time.time()
+        
+        logger.info(f"Waiting for {min_tags} NFC tags (timeout: {timeout}s)...")
+        
+        while time.time() - start_time < timeout:
+            num_tags = self.get_num_tags()
+            
+            if num_tags >= min_tags:
+                logger.info(f"Found {num_tags} tags, reading data...")
+                
+                # Get all tag data
+                all_tags = self.read_all_text()
+                if all_tags and len(all_tags) >= min_tags:
+                    logger.info(f"Successfully read data from {len(all_tags)} tags")
+                    return all_tags
+                else:
+                    logger.debug(f"Found {num_tags} tags but only {len(all_tags) if all_tags else 0} with text")
+            
+            time.sleep(check_interval)
+        
+        logger.info("Timeout waiting for multiple tags")
+        return None
+    
     def wait_for_tag(self, timeout: float = 30.0, check_interval: float = 0.1) -> Optional[Dict[str, str]]:
         """
         Wait for an NFC tag and read text from it.
@@ -305,6 +439,112 @@ def get_tag_data(timeout: float = 30.0, check_interval: float = 0.1) -> Optional
                 combined_data = {**tag_info, **result}
                 return combined_data
         return None
+
+
+# Multi-tag convenience functions
+
+def read_multiple_tags(min_tags: int = 2, timeout: float = 30.0, check_interval: float = 0.1) -> Optional[List[Dict[str, Any]]]:
+    """
+    Read text from multiple NFC tags simultaneously.
+    
+    Args:
+        min_tags: Minimum number of tags to wait for
+        timeout: Maximum time to wait for tags (seconds)
+        check_interval: How often to check for tags (seconds)
+        
+    Returns:
+        list: List of tag data dictionaries, or None if insufficient tags found
+        
+    Example:
+        tags = nfc_reader.read_multiple_tags(min_tags=2, timeout=30)
+        if tags:
+            for i, tag in enumerate(tags):
+                print(f"Tag {i+1}: {tag['text']} (UID: {tag['uid']})")
+    """
+    with NFCReader() as reader:
+        return reader.wait_for_multiple_tags(min_tags=min_tags, timeout=timeout, check_interval=check_interval)
+
+
+def get_all_tag_info(timeout: float = 10.0, check_interval: float = 0.1) -> Optional[List[Dict[str, Any]]]:
+    """
+    Get information for all currently detected NFC tags.
+    
+    Args:
+        timeout: Maximum time to wait for tags (seconds)
+        check_interval: How often to check for tags (seconds)
+        
+    Returns:
+        list: List of tag information dictionaries, or None if no tags
+        
+    Example:
+        tags = nfc_reader.get_all_tag_info(timeout=10)
+        if tags:
+            print(f"Found {len(tags)} tags:")
+            for tag in tags:
+                print(f"  UID: {tag['uid']}, Tech: {tag['technology_name']}")
+    """
+    with NFCReader() as reader:
+        reader.start_discovery()
+        
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if reader.get_num_tags() > 0:
+                return reader.get_all_tags_info()
+            time.sleep(check_interval)
+        
+        return None
+
+
+def monitor_multiple_tags(callback=None, min_tags: int = 1, check_interval: float = 0.5):
+    """
+    Continuously monitor for multiple NFC tags and call callback when tags change.
+    
+    Args:
+        callback: Function to call with tag data when tags change
+        min_tags: Minimum number of tags to trigger callback
+        check_interval: How often to check for tag changes (seconds)
+        
+    Example:
+        def on_tags_changed(tags):
+            print(f"Tags changed: {len(tags)} tags detected")
+            for tag in tags:
+                print(f"  {tag.get('text', 'No text')}")
+        
+        nfc_reader.monitor_multiple_tags(callback=on_tags_changed, min_tags=1)
+    """
+    with NFCReader() as reader:
+        last_tag_count = 0
+        last_tags = []
+        
+        while True:
+            try:
+                current_count = reader.get_num_tags()
+                
+                if current_count != last_tag_count and current_count >= min_tags:
+                    current_tags = reader.read_all_text() or []
+                    
+                    # Check if tag content has changed
+                    if current_tags != last_tags:
+                        if callback:
+                            callback(current_tags)
+                        else:
+                            print(f"[{time.strftime('%H:%M:%S')}] Found {len(current_tags)} tags with text")
+                            for i, tag in enumerate(current_tags):
+                                text = tag.get('text', 'No text')
+                                uid = tag.get('uid', 'Unknown')[:8] + "..."
+                                print(f"  Tag {i+1}: '{text}' (UID: {uid})")
+                        
+                        last_tags = current_tags
+                
+                last_tag_count = current_count
+                time.sleep(check_interval)
+                
+            except KeyboardInterrupt:
+                print("\nMonitoring stopped")
+                break
+            except Exception as e:
+                print(f"Error during monitoring: {e}")
+                time.sleep(1)
 
 
 # Module-level functions for backward compatibility and convenience
