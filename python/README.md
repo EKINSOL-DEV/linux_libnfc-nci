@@ -8,8 +8,10 @@ The Python interface provides a simple way to:
 - Initialize and manage the NFC stack
 - Detect NFC tags
 - Read NDEF text records
+- Write NDEF text records to tags
 - Extract text content and language information
 - Get detailed tag information
+- Work with multiple tags simultaneously
 
 ## Files
 
@@ -17,6 +19,9 @@ The Python interface provides a simple way to:
 - `setup.py` - Build configuration for the Python extension
 - `nfc_reader.py` - High-level Python module with easy-to-use functions
 - `example_text_reader.py` - Example script demonstrating various usage patterns
+- `nfc_tag_write_demo.py` - Demo script for writing text to NFC tags
+- `multi_tag_demo.py` - Demo script for multi-tag detection and reading
+- `nfc_monitor_demo.py` - Real-time monitoring demo
 - `build.sh` - Build script to compile the extension
 - `README.md` - This file
 
@@ -86,6 +91,51 @@ if tag_data:
     print(f"UID: {tag_data['uid']}")
     print(f"Technology: {tag_data['technology_name']}")
     print(f"Text: {tag_data.get('text', 'No text found')}")
+```
+
+### Writing to NFC Tags
+
+```python
+import nfc_reader
+
+# Simple text writing
+success = nfc_reader.write_text_to_tag("Hello, World!", "en", timeout=30)
+if success:
+    print("Text written successfully!")
+
+# Create NDEF record without writing
+ndef_data = nfc_reader.create_ndef_text_record("Test message", "en")
+if ndef_data:
+    print(f"Created NDEF record ({len(ndef_data)} bytes)")
+    
+    # Write the NDEF data to a tag
+    success = nfc_reader.write_ndef_to_tag(ndef_data, timeout=30)
+    if success:
+        print("NDEF data written successfully!")
+
+# Advanced writing with context manager
+with nfc_reader.NFCReader() as reader:
+    reader.start_discovery()
+    
+    # Wait for tag
+    print("Place a writable tag near the reader...")
+    while not reader.is_tag_present():
+        time.sleep(0.1)
+    
+    # Read current content (for backup)
+    current_content = reader.read_text()
+    if current_content:
+        print(f"Current content: '{current_content['text']}'")
+    
+    # Write new text
+    success = reader.write_text("New content", "en")
+    if success:
+        print("Text written successfully!")
+        
+        # Verify by reading back
+        verification = reader.read_text()
+        if verification and verification['text'] == "New content":
+            print("Write verified successfully!")
 ```
 
 ### Multi-Tag Support
@@ -195,6 +245,28 @@ sudo python nfc_monitor_demo.py
 sudo python nfc_monitor_demo.py --simple
 ```
 
+### Tag Writing Demo
+
+```bash
+# Simple text writing
+sudo python nfc_tag_write_demo.py --mode simple --text "Hello, World!"
+
+# Interactive writing mode
+sudo python nfc_tag_write_demo.py --mode interactive
+
+# Batch writing multiple texts
+sudo python nfc_tag_write_demo.py --mode batch --text "Text1;Text2;Text3"
+
+# Write with comprehensive verification
+sudo python nfc_tag_write_demo.py --mode verify --text "Test message"
+
+# Write in different language
+sudo python nfc_tag_write_demo.py --mode simple --text "Bonjour" --language fr
+
+# Force mode (skip confirmations)
+sudo python nfc_tag_write_demo.py --mode simple --text "Quick write" --force
+```
+
 ## API Reference
 
 ### High-level Functions
@@ -208,6 +280,11 @@ sudo python nfc_monitor_demo.py --simple
 - `read_multiple_tags(min_tags=2, timeout=30)` - Read from multiple tags simultaneously
 - `get_all_tag_info(timeout=10)` - Get information for all detected tags
 - `monitor_multiple_tags(callback=None, min_tags=1)` - Continuous multi-tag monitoring
+
+#### Writing Functions
+- `write_text_to_tag(text, language_code="en", timeout=30)` - Simple text writing to tag
+- `create_ndef_text_record(text, language_code="en")` - Create NDEF text record
+- `write_ndef_to_tag(ndef_data, timeout=30)` - Write pre-created NDEF data to tag
 
 ### NFCReader Class
 
@@ -231,6 +308,11 @@ sudo python nfc_monitor_demo.py --simple
 - `read_all_text()` - Read text from all detected tags
 - `get_all_tags_info()` - Get info for all detected tags
 - `wait_for_multiple_tags(min_tags=2, timeout=30)` - Wait for multiple tags
+
+#### Writing Methods
+- `create_text_ndef(text, language_code="en")` - Create NDEF text record
+- `write_ndef(ndef_data)` - Write NDEF data to current tag
+- `write_text(text, language_code="en")` - Write text to current tag
 
 ### Low-level Functions
 
@@ -297,6 +379,23 @@ ls -la ../libnfc_nci_linux.so
    - Ensure the NFC tag contains NDEF text records
    - Try with a known working tag (like one written by an Android phone)
    - Check that the tag is close enough to the reader
+
+4. **"Failed to write text to tag"**
+   - Ensure the tag is writable (not read-only)
+   - Check that the tag supports NDEF format
+   - Some tags need to be formatted before first use
+   - Verify tag is close enough to the reader
+   - Try writing shorter text content
+
+### Writing Safety
+
+When writing to NFC tags:
+
+1. **Always backup existing content** - The demos automatically read current content before writing
+2. **Use confirmation prompts** - All demos include safety confirmations unless `--force` is used
+3. **Verify writes** - Check that written content matches expected content
+4. **Handle write-protected tags** - Some tags may be locked or read-only
+5. **Test with disposable tags** - Use test tags when developing to avoid losing important data
 
 ## Supported Tag Types
 

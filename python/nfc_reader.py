@@ -287,6 +287,64 @@ class NFCReader:
             logger.error(f"Error getting all tags info: {e}")
             return None
     
+    def create_text_ndef(self, text: str, language_code: str = "en") -> Optional[bytes]:
+        """
+        Create an NDEF text record.
+        
+        Args:
+            text: The text content to encode
+            language_code: Language code (default: "en")
+            
+        Returns:
+            bytes: NDEF record data, or None if creation failed
+        """
+        try:
+            return nfc_native.create_text_ndef(language_code, text)
+        except Exception as e:
+            logger.error(f"Error creating NDEF text record: {e}")
+            return None
+    
+    def write_ndef(self, ndef_data: bytes) -> bool:
+        """
+        Write NDEF data to the currently detected tag.
+        
+        Args:
+            ndef_data: NDEF record data to write
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not self._initialized:
+            logger.error("NFC not initialized")
+            return False
+        
+        try:
+            return nfc_native.write_ndef(ndef_data)
+        except Exception as e:
+            logger.error(f"Error writing NDEF data: {e}")
+            return False
+    
+    def write_text(self, text: str, language_code: str = "en") -> bool:
+        """
+        Write text to the currently detected tag.
+        
+        Args:
+            text: Text content to write
+            language_code: Language code (default: "en")
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not self._initialized:
+            logger.error("NFC not initialized")
+            return False
+        
+        try:
+            return nfc_native.write_text(text, language_code)
+        except Exception as e:
+            logger.error(f"Error writing text: {e}")
+            return False
+    
     def wait_for_multiple_tags(self, min_tags: int = 2, timeout: float = 30.0, 
                              check_interval: float = 0.1) -> Optional[List[Dict[str, Any]]]:
         """
@@ -545,6 +603,106 @@ def monitor_multiple_tags(callback=None, min_tags: int = 1, check_interval: floa
             except Exception as e:
                 print(f"Error during monitoring: {e}")
                 time.sleep(1)
+
+
+# Convenience functions for writing
+
+def write_text_to_tag(text: str, language_code: str = "en", timeout: float = 30.0) -> bool:
+    """
+    Simple function to write text to an NFC tag.
+    
+    Args:
+        text: Text content to write
+        language_code: Language code (default: "en")
+        timeout: Maximum time to wait for a tag (seconds)
+        
+    Returns:
+        bool: True if successful, False otherwise
+        
+    Example:
+        success = nfc_reader.write_text_to_tag("Hello, World!", "en", timeout=30)
+        if success:
+            print("Text written successfully!")
+    """
+    with NFCReader() as reader:
+        reader.start_discovery()
+        
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if reader.is_tag_present():
+                logger.info("Tag detected, writing text...")
+                success = reader.write_text(text, language_code)
+                if success:
+                    logger.info(f"Successfully wrote text: '{text}'")
+                    return True
+                else:
+                    logger.error("Failed to write text to tag")
+                    return False
+            time.sleep(0.1)
+        
+        logger.info("Timeout waiting for tag")
+        return False
+
+
+def create_ndef_text_record(text: str, language_code: str = "en") -> Optional[bytes]:
+    """
+    Create an NDEF text record without writing it to a tag.
+    
+    Args:
+        text: Text content to encode
+        language_code: Language code (default: "en")
+        
+    Returns:
+        bytes: NDEF record data, or None if creation failed
+        
+    Example:
+        ndef_data = nfc_reader.create_ndef_text_record("Hello, World!", "en")
+        if ndef_data:
+            print(f"Created NDEF record ({len(ndef_data)} bytes)")
+    """
+    try:
+        return nfc_native.create_text_ndef(language_code, text)
+    except Exception as e:
+        logger.error(f"Error creating NDEF text record: {e}")
+        return None
+
+
+def write_ndef_to_tag(ndef_data: bytes, timeout: float = 30.0) -> bool:
+    """
+    Write pre-created NDEF data to an NFC tag.
+    
+    Args:
+        ndef_data: NDEF record data to write
+        timeout: Maximum time to wait for a tag (seconds)
+        
+    Returns:
+        bool: True if successful, False otherwise
+        
+    Example:
+        ndef_data = nfc_reader.create_ndef_text_record("Hello, World!")
+        if ndef_data:
+            success = nfc_reader.write_ndef_to_tag(ndef_data, timeout=30)
+            if success:
+                print("NDEF data written successfully!")
+    """
+    with NFCReader() as reader:
+        reader.start_discovery()
+        
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if reader.is_tag_present():
+                logger.info("Tag detected, writing NDEF data...")
+                success = reader.write_ndef(ndef_data)
+                if success:
+                    logger.info(f"Successfully wrote NDEF data ({len(ndef_data)} bytes)")
+                    return True
+                else:
+                    logger.error("Failed to write NDEF data to tag")
+                    return False
+            time.sleep(0.1)
+        
+        logger.info("Timeout waiting for tag")
+        return False
 
 
 # Module-level functions for backward compatibility and convenience

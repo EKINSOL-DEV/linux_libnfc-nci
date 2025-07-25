@@ -368,6 +368,121 @@ static PyObject* py_nfc_read_all_text(PyObject* self, PyObject* args) {
     return tag_list;
 }
 
+// Create NDEF text record
+static PyObject* py_nfc_create_text_ndef(PyObject* self, PyObject* args) {
+    const char* language_code;
+    const char* text;
+    
+    if (!PyArg_ParseTuple(args, "ss", &language_code, &text)) {
+        return NULL;
+    }
+    
+    if (!language_code || !text) {
+        PyErr_SetString(PyExc_ValueError, "Language code and text cannot be NULL");
+        return NULL;
+    }
+    
+    // Calculate buffer size (text + language + NDEF overhead)
+    unsigned int buffer_size = strlen(text) + strlen(language_code) + 50;
+    unsigned char* ndef_buffer = malloc(buffer_size);
+    if (!ndef_buffer) {
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate NDEF buffer");
+        return NULL;
+    }
+    
+    int ndef_size = ndef_createText((char*)language_code, (char*)text, ndef_buffer, buffer_size);
+    if (ndef_size <= 0) {
+        free(ndef_buffer);
+        PyErr_SetString(PyExc_RuntimeError, "Failed to create NDEF text record");
+        return NULL;
+    }
+    
+    // Return NDEF data as bytes object
+    PyObject* result = PyBytes_FromStringAndSize((char*)ndef_buffer, ndef_size);
+    free(ndef_buffer);
+    
+    return result;
+}
+
+// Write NDEF data to current tag
+static PyObject* py_nfc_write_ndef(PyObject* self, PyObject* args) {
+    const char* ndef_data;
+    Py_ssize_t ndef_length;
+    
+    if (!nfc_initialized) {
+        PyErr_SetString(PyExc_RuntimeError, "NFC not initialized");
+        return NULL;
+    }
+    
+    if (!tag_detected) {
+        PyErr_SetString(PyExc_RuntimeError, "No tag detected");
+        return NULL;
+    }
+    
+    if (!PyArg_ParseTuple(args, "y#", &ndef_data, &ndef_length)) {
+        return NULL;
+    }
+    
+    if (!ndef_data || ndef_length <= 0) {
+        PyErr_SetString(PyExc_ValueError, "Invalid NDEF data");
+        return NULL;
+    }
+    
+    int result = nfcTag_writeNdef(detected_tag_info.handle, (unsigned char*)ndef_data, ndef_length);
+    if (result != 0) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to write NDEF data to tag");
+        return NULL;
+    }
+    
+    Py_RETURN_TRUE;
+}
+
+// Write text to current tag (convenience function)
+static PyObject* py_nfc_write_text(PyObject* self, PyObject* args) {
+    const char* language_code = "en";
+    const char* text;
+    
+    if (!PyArg_ParseTuple(args, "s|s", &text, &language_code)) {
+        return NULL;
+    }
+    
+    if (!nfc_initialized) {
+        PyErr_SetString(PyExc_RuntimeError, "NFC not initialized");
+        return NULL;
+    }
+    
+    if (!tag_detected) {
+        PyErr_SetString(PyExc_RuntimeError, "No tag detected");
+        return NULL;
+    }
+    
+    // Create NDEF text record
+    unsigned int buffer_size = strlen(text) + strlen(language_code) + 50;
+    unsigned char* ndef_buffer = malloc(buffer_size);
+    if (!ndef_buffer) {
+        PyErr_SetString(PyExc_MemoryError, "Failed to allocate NDEF buffer");
+        return NULL;
+    }
+    
+    int ndef_size = ndef_createText((char*)language_code, (char*)text, ndef_buffer, buffer_size);
+    if (ndef_size <= 0) {
+        free(ndef_buffer);
+        PyErr_SetString(PyExc_RuntimeError, "Failed to create NDEF text record");
+        return NULL;
+    }
+    
+    // Write to tag
+    int result = nfcTag_writeNdef(detected_tag_info.handle, ndef_buffer, ndef_size);
+    free(ndef_buffer);
+    
+    if (result != 0) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to write text to tag");
+        return NULL;
+    }
+    
+    Py_RETURN_TRUE;
+}
+
 // Get information for all detected tags
 static PyObject* py_nfc_get_all_tags_info(PyObject* self, PyObject* args) {
     if (!nfc_initialized) {
@@ -434,6 +549,9 @@ static PyMethodDef NFCMethods[] = {
     {"check_next_protocol", py_nfc_check_next_protocol, METH_NOARGS, "Check next valid protocol"},
     {"read_all_text", py_nfc_read_all_text, METH_NOARGS, "Read text from all detected tags"},
     {"get_all_tags_info", py_nfc_get_all_tags_info, METH_NOARGS, "Get info for all detected tags"},
+    {"create_text_ndef", py_nfc_create_text_ndef, METH_VARARGS, "Create NDEF text record"},
+    {"write_ndef", py_nfc_write_ndef, METH_VARARGS, "Write NDEF data to tag"},
+    {"write_text", py_nfc_write_text, METH_VARARGS, "Write text to tag"},
     {NULL, NULL, 0, NULL}
 };
 
