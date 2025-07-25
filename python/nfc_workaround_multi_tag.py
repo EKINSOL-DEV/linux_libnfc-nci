@@ -86,7 +86,7 @@ class WorkaroundMultiTag:
                             tag_info = reader.get_tag_info()
                             text_data = reader.read_text()
                             
-                            if tag_info:
+                            if tag_info and isinstance(tag_info, dict):
                                 uid = tag_info.get('uid', 'Unknown')
                                 
                                 # Check if this is a new tag
@@ -189,7 +189,7 @@ class WorkaroundMultiTag:
                         try:
                             # Try to read tag info
                             tag_info = reader.get_tag_info()
-                            if tag_info:
+                            if tag_info and isinstance(tag_info, dict):
                                 measurement['tag_info'] = tag_info
                                 uid = tag_info.get('uid', 'Unknown')
                                 tech = tag_info.get('technology_name', 'Unknown')
