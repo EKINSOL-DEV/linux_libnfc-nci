@@ -289,85 +289,92 @@ class MultiTagMonitor:
                 if uid in self.tag_order:
                     self.tag_order.remove(uid)
     
-    def run(self):
-        """Run the multi-tag monitor."""
-        print("🔍 Real-Time Multi-Tag NFC Monitor")
-        print("=" * 40)
-        print("This monitor shows live updates as tags are added and removed.")
-        print("Place multiple NFC tags near the reader to see them appear.")
-        print("\nInitializing NFC...")
+    def simple_scan_texts(self, reader):
+        """Simple scan that just returns array of text from all tags."""
+        texts = []
         
         try:
-            # Use NFCReader context manager like the working tests
+            # Get total count
+            num_tags = reader.get_num_tags()
+            
+            # If no tags, check with is_tag_present as fallback
+            if num_tags <= 0:
+                if reader.is_tag_present():
+                    num_tags = 1
+                else:
+                    return texts
+            
+            # Read first tag
+            try:
+                text_data = reader.read_text()
+                if text_data and text_data.get('text'):
+                    texts.append(text_data['text'])
+                else:
+                    texts.append("No text")
+            except:
+                texts.append("Read error")
+            
+            # Read additional tags if present
+            if num_tags > 1:
+                for tag_index in range(1, num_tags):
+                    try:
+                        if nfc_native.select_next_tag():
+                            time.sleep(0.1)  # Pause for tag switch
+                            text_data = reader.read_text()
+                            if text_data and text_data.get('text'):
+                                texts.append(text_data['text'])
+                            else:
+                                texts.append("No text")
+                        else:
+                            break
+                    except:
+                        break
+        except:
+            pass
+        
+        return texts
+
+    def run(self):
+        """Run the simple multi-tag monitor."""
+        print("🔍 Simple Multi-Tag NFC Monitor")
+        print("Shows text from all tags in range, updated every second")
+        print("Press Ctrl+C to stop")
+        print("-" * 50)
+        
+        try:
             with nfc_reader.NFCReader() as reader:
                 reader.start_discovery()
+                print("✅ NFC initialized")
                 
-                print("✅ NFC initialized and discovery started")
-                print(f"🔄 Refresh rate: {int(self.refresh_rate * 1000)}ms")
-                
-                print("\n" * 3)  # Initial spacing for display
-                
-                # Main monitoring loop
-                scan_error_count = 0
                 while self.running:
                     try:
-                        # Scan for current tags using the reader
-                        scanned_tags = self.scan_tags(reader)
-                        scan_error_count = 0  # Reset error counter on successful scan
+                        # Get texts from all tags
+                        tag_texts = self.simple_scan_texts(reader)
                         
-                        # Update tag list and detect changes
-                        self.update_tag_list(scanned_tags)
+                        # Output current timestamp and tag texts
+                        timestamp = datetime.now().strftime("%H:%M:%S")
+                        if tag_texts:
+                            print(f"[{timestamp}] Tags: {tag_texts}")
+                        else:
+                            print(f"[{timestamp}] Tags: []")
                         
-                        # Clear previous display and show current status
-                        self.clear_display()
-                        self.display_status()
-                        
-                        # Adaptive refresh rate: slower for multi-tag scenarios to prevent cycling
-                        current_refresh_rate = self.refresh_rate
-                        if len(scanned_tags) > 1:
-                            # Slower refresh when multiple tags are detected to prevent interference
-                            current_refresh_rate = max(self.refresh_rate * 2, 0.2)  # At least 200ms
-                        
-                        # Wait before next refresh
-                        time.sleep(current_refresh_rate)
+                        # Wait 1 second
+                        time.sleep(1.0)
                     
                     except KeyboardInterrupt:
-                        # Handled by signal handler
                         break
                     except Exception as e:
-                        scan_error_count += 1
-                        print(f"\n❌ Monitor error #{scan_error_count}: {e}")
-                        
-                        # If we have many consecutive errors, try restarting discovery
-                        if scan_error_count >= 5:
-                            print(f"\n🔄 Too many scan errors, restarting discovery...")
-                            try:
-                                reader.stop_discovery()
-                                time.sleep(0.1)
-                                reader.start_discovery()
-                                scan_error_count = 0
-                                print(f"✅ Discovery restarted")
-                            except Exception as restart_error:
-                                print(f"❌ Failed to restart discovery: {restart_error}")
-                        
-                        time.sleep(self.refresh_rate * 2)  # Longer pause on error
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Error: {e}")
+                        time.sleep(1.0)
                 
                 return True
         
         except nfc_reader.NFCInitializationError as e:
             print(f"❌ NFC initialization failed: {e}")
-            print("Make sure you're running as root and NFC hardware is connected")
             return False
         except Exception as e:
             print(f"❌ Fatal error: {e}")
             return False
-        
-        finally:
-            # Final summary
-            print(f"\n📊 Final Session Summary:")
-            print(f"   Total tags detected: {self.total_detected}")
-            print(f"   Session duration: {datetime.now() - self.session_start}")
-            print(f"   Peak tags simultaneously: {len(self.current_tags)}")
 
 def main():
     """Main function with argument parsing."""
