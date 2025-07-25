@@ -142,33 +142,24 @@ class MultiTagMonitor:
             
             # Get total count first - this is the primary indicator
             num_tags = reader.get_num_tags()
-            print(f"\n[DEBUG] Initial scan: get_num_tags()={num_tags}")
             
             # If no tags according to count, double-check with is_tag_present
             if num_tags <= 0:
                 is_present = reader.is_tag_present()
-                print(f"\n[DEBUG] No tags from count, is_tag_present()={is_present}")
                 if not is_present:
                     return current_scan
                 # If present but count is 0, treat as 1 tag (fallback for single tag)
                 num_tags = 1
-                print(f"\n[DEBUG] Fallback: treating as single tag, num_tags={num_tags}")
-            
-            print(f"\n[DEBUG] Processing {num_tags} tag(s)")
             
             # Read all tags using selectNextTag cycling
             # First, read the current tag (tag index 0)
             try:
-                print(f"\n[DEBUG] Reading tag 1...")
                 tag_info = reader.get_tag_info()
-                print(f"\n[DEBUG] Tag 1 get_tag_info() result: {tag_info}")
                 
                 if tag_info and isinstance(tag_info, dict):
                     uid = tag_info.get('uid', 'Unknown')
                     
                     if uid != 'Unknown':
-                        print(f"\n[DEBUG] Found tag 1: UID={uid[:16]}..., Tech={tag_info.get('technology_name', 'Unknown')}")
-                        
                         # Create tag data entry
                         tag_data = {
                             'uid': uid,
@@ -180,52 +171,37 @@ class MultiTagMonitor:
                         
                         # Try to read text content
                         try:
-                            print(f"\n[DEBUG] Reading text from tag 1...")
                             text_data = reader.read_text()
-                            print(f"\n[DEBUG] Tag 1 text result: {text_data}")
                             if text_data and text_data.get('text'):
                                 tag_data['text'] = text_data['text']
                                 tag_data['language'] = text_data.get('language', 'unknown')
                             else:
                                 tag_data['text'] = 'No text'
-                        except Exception as e:
-                            print(f"\n[DEBUG] Text read error for tag 1: {e}")
+                        except:
                             tag_data['text'] = 'Read error'
                         
                         current_scan[uid] = tag_data
-                        print(f"\n[DEBUG] Tag 1 added to scan results")
-                    else:
-                        print(f"\n[DEBUG] Tag 1 has unknown UID, skipping")
-                else:
-                    print(f"\n[DEBUG] Tag 1 get_tag_info() returned invalid data")
                     
-            except Exception as e:
-                print(f"\n[DEBUG] Exception reading tag 1: {e}")
+            except:
+                pass
             
             # If there are multiple tags, try to get the others
             if num_tags > 1:
-                print(f"\n[DEBUG] Processing additional {num_tags-1} tags...")
                 for tag_index in range(1, num_tags):
                     try:
-                        print(f"\n[DEBUG] Switching to tag {tag_index+1}...")
                         # Switch to next tag
                         switch_result = nfc_native.select_next_tag()
-                        print(f"\n[DEBUG] selectNextTag() for tag {tag_index+1}: {switch_result}")
                         
                         if switch_result:
-                            time.sleep(0.05)  # Slightly longer pause for tag switch
+                            time.sleep(0.05)  # Pause for tag switch
                             
                             # Get next tag info
-                            print(f"\n[DEBUG] Reading tag {tag_index+1} info...")
                             tag_info = reader.get_tag_info()
-                            print(f"\n[DEBUG] Tag {tag_index+1} get_tag_info() result: {tag_info}")
                             
                             if tag_info and isinstance(tag_info, dict):
                                 uid = tag_info.get('uid', 'Unknown')
                                 
                                 if uid != 'Unknown' and uid not in current_scan:
-                                    print(f"\n[DEBUG] Found tag {tag_index+1}: UID={uid[:16]}..., Tech={tag_info.get('technology_name', 'Unknown')}")
-                                    
                                     # Create tag data entry
                                     tag_data = {
                                         'uid': uid,
@@ -237,39 +213,24 @@ class MultiTagMonitor:
                                     
                                     # Try to read text content
                                     try:
-                                        print(f"\n[DEBUG] Reading text from tag {tag_index+1}...")
                                         text_data = reader.read_text()
-                                        print(f"\n[DEBUG] Tag {tag_index+1} text result: {text_data}")
                                         if text_data and text_data.get('text'):
                                             tag_data['text'] = text_data['text']
                                             tag_data['language'] = text_data.get('language', 'unknown')
                                         else:
                                             tag_data['text'] = 'No text'
-                                    except Exception as e:
-                                        print(f"\n[DEBUG] Text read error for tag {tag_index+1}: {e}")
+                                    except:
                                         tag_data['text'] = 'Read error'
                                     
                                     current_scan[uid] = tag_data
-                                    print(f"\n[DEBUG] Tag {tag_index+1} added to scan results")
-                                elif uid in current_scan:
-                                    print(f"\n[DEBUG] Tag {tag_index+1} UID already in scan (duplicate)")
-                                else:
-                                    print(f"\n[DEBUG] Tag {tag_index+1} has unknown UID")
-                            else:
-                                print(f"\n[DEBUG] Tag {tag_index+1} get_tag_info() returned invalid data")
-                        else:
-                            print(f"\n[DEBUG] selectNextTag() failed for tag {tag_index+1}")
                     
-                    except Exception as e:
-                        print(f"\n[DEBUG] Exception processing tag {tag_index+1}: {e}")
+                    except:
                         continue
         
         except Exception as e:
-            print(f"\n[DEBUG] Critical scan error: {e}")
             # Return empty scan on critical error
             return {}
         
-        print(f"\n[DEBUG] Scan completed: found {len(current_scan)} unique tags")
         return current_scan
     
     def update_tag_list(self, scanned_tags):
