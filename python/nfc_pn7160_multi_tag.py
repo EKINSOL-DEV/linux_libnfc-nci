@@ -136,13 +136,33 @@ class PN7160MultiTag:
                                         except:
                                             pass
                                     
-                                    # Test anti-collision switching
-                                    if len(unique_tags) > 1:
+                                    # Force tag switching when we have multiple tags detected
+                                    if num_tags > 1:
                                         try:
                                             next_result = nfc_native.select_next_tag()
                                             if next_result:
                                                 print(f"    🔄 selectNextTag() succeeded")
                                                 discovery_cycles += 1
+                                                
+                                                # Quick re-read to get the next tag
+                                                time.sleep(0.02)  # Brief pause for switch
+                                                next_info = nfc_native.get_tag_info()
+                                                if next_info and isinstance(next_info, dict):
+                                                    next_uid = next_info.get('uid', 'Unknown')
+                                                    if next_uid != uid and next_uid not in unique_tags and next_uid != 'Unknown':
+                                                        unique_tags.add(next_uid)
+                                                        
+                                                        next_detection = {
+                                                            'uid': next_uid,
+                                                            'technology': next_info.get('technology_name', 'Unknown'),
+                                                            'handle': next_info.get('handle', 'Unknown'),
+                                                            'detection_time': elapsed,
+                                                            'discovery_cycle': discovery_cycles,
+                                                            'tag_count_when_detected': num_tags
+                                                        }
+                                                        
+                                                        rapid_detections.append(next_detection)
+                                                        print(f"    🎯 Found next tag: {next_uid[:16]}... ({next_info.get('technology_name', 'Unknown')})")
                                         except Exception as e:
                                             print(f"    ⚠️  selectNextTag() failed: {e}")
                                         
@@ -160,8 +180,8 @@ class PN7160MultiTag:
                         last_present = is_present
                         last_num_tags = num_tags
                     
-                    # Short polling interval to catch rapid switching
-                    time.sleep(0.05)
+                    # Very short polling interval to catch rapid switching
+                    time.sleep(0.01)  # 10ms intervals for faster detection
                     
                 except KeyboardInterrupt:
                     print("\n⚠️  Discovery interrupted by user")
