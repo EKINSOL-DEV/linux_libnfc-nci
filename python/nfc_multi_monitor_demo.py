@@ -294,17 +294,18 @@ class MultiTagMonitor:
         texts = []
         
         try:
-            # Get total count
+            # Check if any tags are present first
+            if not reader.is_tag_present():
+                return texts
+            
+            # Get total count - but we know getNumTags() returns 0 for single tags
             num_tags = reader.get_num_tags()
             
-            # If no tags, check with is_tag_present as fallback
+            # If getNumTags() returns 0 but tag is present, it's a single tag
             if num_tags <= 0:
-                if reader.is_tag_present():
-                    num_tags = 1
-                else:
-                    return texts
+                num_tags = 1
             
-            # Read first tag
+            # Read first tag (always present if we get here)
             try:
                 text_data = reader.read_text()
                 if text_data and text_data.get('text'):
@@ -314,7 +315,8 @@ class MultiTagMonitor:
             except:
                 texts.append("Read error")
             
-            # Read additional tags if present
+            # Only try selectNextTag() if getNumTags() returned > 1
+            # (because that's the only time it actually works)
             if num_tags > 1:
                 for tag_index in range(1, num_tags):
                     try:
