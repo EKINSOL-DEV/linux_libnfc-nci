@@ -37,13 +37,27 @@ static ndef_info_t detected_ndef_info;
 // Tag callback functions
 static void onTagArrival(nfc_tag_info_t *pTagInfo) {
     if (pTagInfo) {
+        printf("[DEBUG] onTagArrival called - UID: ");
+        for (int i = 0; i < pTagInfo->uid_length && i < 8; i++) {
+            printf("%02X", (unsigned char)pTagInfo->uid[i]);
+        }
+        printf(", Tech: %d\n", pTagInfo->technology);
+        
         memcpy(&detected_tag_info, pTagInfo, sizeof(nfc_tag_info_t));
         tag_detected = 1;
+        
+        // Check how many tags the system thinks we have
+        int current_num_tags = getNumTags();
+        printf("[DEBUG] onTagArrival: getNumTags() now returns %d\n", current_num_tags);
     }
 }
 
 static void onTagDeparture(void) {
+    printf("[DEBUG] onTagDeparture called\n");
     tag_detected = 0;
+    
+    int current_num_tags = getNumTags();
+    printf("[DEBUG] onTagDeparture: getNumTags() now returns %d\n", current_num_tags);
 }
 
 // Python wrapper for doInitialize
@@ -256,6 +270,14 @@ static PyObject* py_nfc_get_num_tags(PyObject* self, PyObject* args) {
     }
     
     int num_tags = getNumTags();
+    
+    // Debug logging
+    static int last_num_tags = -1;
+    if (num_tags != last_num_tags) {
+        printf("[DEBUG] getNumTags() returned: %d (changed from %d)\n", num_tags, last_num_tags);
+        last_num_tags = num_tags;
+    }
+    
     return PyLong_FromLong(num_tags);
 }
 
@@ -266,7 +288,10 @@ static PyObject* py_nfc_select_next_tag(PyObject* self, PyObject* args) {
         return NULL;
     }
     
+    printf("[DEBUG] selectNextTag() called\n");
     int result = selectNextTag();
+    printf("[DEBUG] selectNextTag() returned: %d\n", result);
+    
     if (result == 0) {
         Py_RETURN_TRUE;
     }
@@ -292,7 +317,10 @@ static PyObject* py_nfc_read_all_text(PyObject* self, PyObject* args) {
     }
     
     int num_tags = getNumTags();
+    printf("[DEBUG] read_all_text: getNumTags() returned %d\n", num_tags);
+    
     if (num_tags <= 0) {
+        printf("[DEBUG] read_all_text: No tags detected, returning None\n");
         Py_RETURN_NONE;
     }
     
@@ -310,6 +338,8 @@ static PyObject* py_nfc_read_all_text(PyObject* self, PyObject* args) {
     
     // Read from each tag
     for (int i = 0; i < num_tags; i++) {
+        printf("[DEBUG] read_all_text: Processing tag %d of %d\n", i+1, num_tags);
+        
         PyObject* tag_data = PyDict_New();
         if (!tag_data) {
             Py_DECREF(tag_list);
@@ -352,10 +382,17 @@ static PyObject* py_nfc_read_all_text(PyObject* self, PyObject* args) {
         
         // Select next tag if not the last one
         if (i < num_tags - 1) {
-            selectNextTag();
+            printf("[DEBUG] read_all_text: Selecting next tag...\n");
+            int select_result = selectNextTag();
+            printf("[DEBUG] read_all_text: selectNextTag() returned %d\n", select_result);
+            
             // Small delay to allow tag switch
             struct timespec ts = {0, 50000000}; // 50ms
             nanosleep(&ts, NULL);
+            
+            // Check if tag count changed
+            int new_num_tags = getNumTags();
+            printf("[DEBUG] read_all_text: After selectNextTag, getNumTags() = %d\n", new_num_tags);
         }
     }
     

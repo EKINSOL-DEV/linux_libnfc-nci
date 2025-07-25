@@ -81,21 +81,125 @@ class MultiTagDemo:
             print()
     
     def simple_multi_tag_detection(self):
-        """Simple demonstration of multi-tag detection."""
+        """Simple demonstration of multi-tag detection with fallback."""
         self.print_header("Simple Multi-Tag Detection")
+        print("This demo will try multiple strategies to detect multiple tags.")
         print("Place 2 or more NFC tags near the reader...")
         print("Waiting for multiple tags (30 second timeout)...")
         
-        tags = nfc_reader.read_multiple_tags(min_tags=2, timeout=30)
+        # First attempt: Standard multi-tag detection
+        print("\n🔄 Attempting simultaneous detection...")
+        tags = nfc_reader.read_multiple_tags(min_tags=2, timeout=20)
         
-        if tags:
+        if tags and len(tags) >= 2:
             print(f"\n✅ Success! Found {len(tags)} tags with text content:")
             self.print_tag_summary(tags)
             return True
-        else:
-            print("\n❌ Timeout or insufficient tags found")
-            print("Try placing multiple NFC tags closer to the reader")
-            return False
+        
+        # Fallback: Check if hardware issue or no tags
+        print("\n⚠️  Simultaneous detection failed. Checking hardware...")
+        
+        with nfc_reader.NFCReader() as reader:
+            reader.start_discovery()
+            
+            # Test basic tag detection
+            print("Testing if ANY tags are detected...")
+            start_time = time.time()
+            any_tag_detected = False
+            
+            while time.time() - start_time < 5:
+                if reader.is_tag_present():
+                    any_tag_detected = True
+                    num_tags = reader.get_num_tags()
+                    print(f"✅ Tag detected! getNumTags() reports: {num_tags}")
+                    
+                    if num_tags >= 2:
+                        print("🎉 Multiple tags detected by getNumTags()!")
+                        # Try to read them
+                        try:
+                            all_tags = reader.read_all_text()
+                            if all_tags:
+                                print(f"✅ Successfully read {len(all_tags)} tags!")
+                                self.print_tag_summary(all_tags)
+                                return True
+                        except Exception as e:
+                            print(f"⚠️  Error reading multiple tags: {e}")
+                    break
+                time.sleep(0.2)
+            
+            if not any_tag_detected:
+                print("\n❌ No tags detected at all")
+                print("\nTroubleshooting:")
+                print("1. Make sure NFC tags are close to the reader") 
+                print("2. Try with a single tag first to test basic functionality")
+                print("3. Check that tags contain NDEF text records")
+                return False
+            
+            # Fallback: Rapid sequential detection
+            print("\n🔄 Trying rapid sequential detection...")
+            print("Quickly place and remove tags one at a time:")
+            
+            detected_tags = []
+            seen_uids = set()
+            start_time = time.time()
+            last_tag_present = False
+            
+            while time.time() - start_time < 20 and len(detected_tags) < 3:
+                is_present = reader.is_tag_present()
+                
+                # Tag arrival
+                if is_present and not last_tag_present:
+                    try:
+                        tag_info = reader.get_tag_info()
+                        if tag_info:
+                            uid = tag_info.get('uid', 'Unknown')
+                            
+                            if uid not in seen_uids:
+                                seen_uids.add(uid)
+                                
+                                # Try to read text
+                                text_data = reader.read_text()
+                                tag_data = {**tag_info}
+                                if text_data:
+                                    tag_data.update(text_data)
+                                
+                                detected_tags.append(tag_data)
+                                
+                                tech = tag_info.get('technology_name', 'Unknown')
+                                text = text_data.get('text', 'No text') if text_data else 'No text'
+                                print(f"📱 Tag {len(detected_tags)}: {tech} - '{text}'")
+                                
+                                if len(detected_tags) >= 2:
+                                    print(f"\n✅ Sequential detection successful!")
+                                    self.print_tag_summary(detected_tags)
+                                    return True
+                                else:
+                                    print(f"   Remove this tag and place another one...")
+                    
+                    except Exception as e:
+                        print(f"⚠️  Error reading tag: {e}")
+                
+                last_tag_present = is_present
+                time.sleep(0.1)
+            
+            if len(detected_tags) >= 2:
+                print(f"\n✅ Sequential detection found {len(detected_tags)} tags!")
+                self.print_tag_summary(detected_tags)
+                return True
+            elif len(detected_tags) == 1:
+                print(f"\n⚠️  Only detected 1 tag sequentially")
+                print("\nPossible issues:")
+                print("1. Your NFC hardware may not support multiple tag detection")
+                print("2. Try the enhanced multi-tag demo: nfc_multi_tag_enhanced.py")
+                print("3. Use the diagnostic tool: nfc_multi_tag_diagnostic.py")
+                return False
+            else:
+                print("\n❌ No tags detected in sequential mode either")
+                print("\nRecommendations:")
+                print("1. Test with a single tag first")
+                print("2. Run the diagnostic script: sudo python nfc_multi_tag_diagnostic.py")
+                print("3. Check NFC hardware compatibility")
+                return False
     
     def monitor_multiple_tags(self):
         """Continuous monitoring for multiple tags."""

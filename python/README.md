@@ -20,7 +20,9 @@ The Python interface provides a simple way to:
 - `nfc_reader.py` - High-level Python module with easy-to-use functions
 - `example_text_reader.py` - Example script demonstrating various usage patterns
 - `nfc_tag_write_demo.py` - Demo script for writing text to NFC tags
-- `multi_tag_demo.py` - Demo script for multi-tag detection and reading
+- `multi_tag_demo.py` - Demo script for multi-tag detection and reading (with fallback)
+- `nfc_multi_tag_enhanced.py` - Enhanced multi-tag demo with hardware adaptation
+- `nfc_multi_tag_diagnostic.py` - Diagnostic tool for multi-tag hardware capabilities
 - `nfc_monitor_demo.py` - Real-time monitoring demo
 - `build.sh` - Build script to compile the extension
 - `README.md` - This file
@@ -222,7 +224,7 @@ sudo python example_text_reader.py --errors
 ### Multi-Tag Examples
 
 ```bash
-# Simple multi-tag detection
+# Simple multi-tag detection (with fallback strategies)
 sudo python multi_tag_demo.py --mode simple
 
 # Continuous multi-tag monitoring
@@ -233,6 +235,18 @@ sudo python multi_tag_demo.py --mode detailed
 
 # Interactive tag selection
 sudo python multi_tag_demo.py --mode interactive
+
+# Enhanced multi-tag detection with hardware adaptation
+sudo python nfc_multi_tag_enhanced.py --mode auto
+
+# Test all multi-tag strategies
+sudo python nfc_multi_tag_enhanced.py --mode test
+
+# Force specific detection strategy
+sudo python nfc_multi_tag_enhanced.py --mode sequential --min-tags 3
+
+# Multi-tag hardware diagnostic
+sudo python nfc_multi_tag_diagnostic.py
 ```
 
 ### Continuous Monitoring Demo
@@ -386,6 +400,13 @@ ls -la ../libnfc_nci_linux.so
    - Some tags need to be formatted before first use
    - Verify tag is close enough to the reader
    - Try writing shorter text content
+
+5. **Multi-tag detection not working**
+   - Many NFC readers don't support true simultaneous multi-tag detection
+   - Run the diagnostic: `sudo python nfc_multi_tag_diagnostic.py`
+   - Try the enhanced demo: `sudo python nfc_multi_tag_enhanced.py --mode auto`
+   - Use sequential detection as fallback: place tags one at a time quickly
+   - Check if getNumTags() returns values > 1 with debug logging enabled
 
 ### Writing Safety
 
