@@ -256,9 +256,9 @@ class NoAntiCollisionTest:
                                     d for d in simultaneous_detections 
                                     if current_time - d['time'] < 1.0
                                 ]
-                
-                except Exception as e:
-                    print(f"❌ Passive-only read error: {e}")
+                    
+                    except Exception as e:
+                        print(f"❌ Passive-only read error: {e}")
                 
                 time.sleep(0.02)  # 20ms polling for faster detection
             
