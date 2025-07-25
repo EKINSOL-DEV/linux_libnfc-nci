@@ -136,10 +136,6 @@ class MultiTagMonitor:
         current_scan = {}
         
         try:
-            # Start with a direct discovery check - don't rely on is_tag_present() alone
-            # as it may be too restrictive for multi-tag scenarios
-            reader.start_discovery()  # Ensure discovery is active
-            
             # Get total count first - this is the primary indicator
             num_tags = reader.get_num_tags()
             
@@ -150,6 +146,12 @@ class MultiTagMonitor:
                     return current_scan
                 # If present but count is 0, treat as 1 tag (fallback for single tag)
                 num_tags = 1
+            
+            # For multi-tag scenarios, use a more conservative scanning approach
+            # to prevent rapid state changes that confuse the hardware
+            if num_tags > 1:
+                # Add a small delay before multi-tag scanning to let hardware stabilize
+                time.sleep(0.02)
             
             # Read all tags using selectNextTag cycling
             # First, read the current tag (tag index 0)
@@ -186,14 +188,22 @@ class MultiTagMonitor:
                 pass
             
             # If there are multiple tags, try to get the others
+            # Use more conservative approach to prevent cycling issues
             if num_tags > 1:
                 for tag_index in range(1, num_tags):
                     try:
-                        # Switch to next tag
+                        # Switch to next tag with better error handling
                         switch_result = nfc_native.select_next_tag()
                         
                         if switch_result:
-                            time.sleep(0.05)  # Pause for tag switch
+                            # Longer pause for multi-tag switching to prevent interference
+                            time.sleep(0.1)
+                            
+                            # Verify we can still get tag count after switching
+                            current_count = reader.get_num_tags()
+                            if current_count < num_tags:
+                                # Tag selection is unstable, break out
+                                break
                             
                             # Get next tag info
                             tag_info = reader.get_tag_info()
@@ -223,9 +233,16 @@ class MultiTagMonitor:
                                         tag_data['text'] = 'Read error'
                                     
                                     current_scan[uid] = tag_data
+                                else:
+                                    # Duplicate or invalid UID, stop scanning to prevent instability
+                                    break
+                        else:
+                            # selectNextTag failed, stop trying
+                            break
                     
                     except:
-                        continue
+                        # Any error during multi-tag scanning, stop to prevent cycling
+                        break
         
         except Exception as e:
             # Return empty scan on critical error
@@ -305,8 +322,14 @@ class MultiTagMonitor:
                         self.clear_display()
                         self.display_status()
                         
+                        # Adaptive refresh rate: slower for multi-tag scenarios to prevent cycling
+                        current_refresh_rate = self.refresh_rate
+                        if len(scanned_tags) > 1:
+                            # Slower refresh when multiple tags are detected to prevent interference
+                            current_refresh_rate = max(self.refresh_rate * 2, 0.2)  # At least 200ms
+                        
                         # Wait before next refresh
-                        time.sleep(self.refresh_rate)
+                        time.sleep(current_refresh_rate)
                     
                     except KeyboardInterrupt:
                         # Handled by signal handler
