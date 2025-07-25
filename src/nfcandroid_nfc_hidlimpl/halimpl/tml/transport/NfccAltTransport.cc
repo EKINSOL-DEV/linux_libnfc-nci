@@ -414,7 +414,7 @@ void NfccAltTransport::gpio_set_ven(int value) {
 }
   
 
-void NfccAltTransport::gpio_set_fwld(int value) {
+void NfccAltTransport::gpio_set_fwdl(int value) {
 //NXP Test new Raspberry pi os
     if (value == 0) {
         gpiod_line_set_value(FWDNLD_line, 0);
