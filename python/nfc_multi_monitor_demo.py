@@ -137,11 +137,17 @@ class MultiTagMonitor:
         
         try:
             # Check if any tags are present
-            if not reader.is_tag_present():
+            is_present = reader.is_tag_present()
+            if not is_present:
                 return current_scan
             
             # Get total count
             num_tags = reader.get_num_tags()
+            
+            # Debug output (will be overwritten by display refresh)
+            if num_tags > 0:
+                print(f"\n[DEBUG] Tags detected: is_present={is_present}, num_tags={num_tags}")
+            
             if num_tags <= 0:
                 return current_scan
             
@@ -154,6 +160,8 @@ class MultiTagMonitor:
                         uid = tag_info.get('uid', 'Unknown')
                         
                         if uid != 'Unknown':
+                            print(f"\n[DEBUG] Found tag {tag_index+1}: UID={uid[:16]}..., Tech={tag_info.get('technology_name', 'Unknown')}")
+                            
                             # Create tag data entry
                             tag_data = {
                                 'uid': uid,
