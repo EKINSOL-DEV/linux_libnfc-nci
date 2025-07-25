@@ -68,7 +68,12 @@ ConfigValue::ConfigValue() {
 
 ConfigValue::ConfigValue(std::string value) {
   // Don't allow empty strings
-  CHECK(!(value.empty()));
+  if (value.empty()) {
+    LOG(ERROR) << "ConfigValue - Cannot create ConfigValue with empty string";
+    type_ = UNSIGNED;
+    value_unsigned_ = 0;
+    return;
+  }
   type_ = STRING;
   value_string_ = value;
   value_unsigned_ = 0;
@@ -80,7 +85,12 @@ ConfigValue::ConfigValue(unsigned value) {
 }
 
 ConfigValue::ConfigValue(std::vector<uint8_t> value) {
-  CHECK(!(value.empty()));
+  if (value.empty()) {
+    LOG(ERROR) << "ConfigValue - Cannot create ConfigValue with empty byte array";
+    type_ = UNSIGNED;
+    value_unsigned_ = 0;
+    return;
+  }
   type_ = BYTES;
   value_bytes_ = value;
   value_unsigned_ = 0;
@@ -89,30 +99,45 @@ ConfigValue::ConfigValue(std::vector<uint8_t> value) {
 ConfigValue::Type ConfigValue::getType() const { return type_; }
 
 std::string ConfigValue::getString() const {
-  CHECK(type_ == STRING);
+  if (type_ != STRING) {
+    LOG(ERROR) << "ConfigValue - getString called on non-string value (type=" << type_ << ")";
+    return "";
+  }
   return value_string_;
 };
 
 unsigned ConfigValue::getUnsigned() const {
-  CHECK(type_ == UNSIGNED);
+  if (type_ != UNSIGNED) {
+    LOG(ERROR) << "ConfigValue - getUnsigned called on non-unsigned value (type=" << type_ << ")";
+    return 0;
+  }
   return value_unsigned_;
 };
 
 std::vector<uint8_t> ConfigValue::getBytes() const {
-  CHECK(type_ == BYTES);
+  if (type_ != BYTES) {
+    LOG(ERROR) << "ConfigValue - getBytes called on non-bytes value (type=" << type_ << ")";
+    return std::vector<uint8_t>();
+  }
   return value_bytes_;
 };
 
 bool ConfigValue::parseFromString(std::string in) {
   if (in.length() > 1 && in[0] == '"' && in[in.length() - 1] == '"') {
-    CHECK(in.length() > 2);  // Don't allow empty strings
+    if (in.length() <= 2) {
+      LOG(ERROR) << "ConfigValue - Empty quoted string not allowed";
+      return false;
+    }
     type_ = STRING;
     value_string_ = in.substr(1, in.length() - 2);
     return true;
   }
 
   if (in.length() > 1 && in[0] == '{' && in[in.length() - 1] == '}') {
-    CHECK(in.length() >= 4);  // Needs at least one byte
+    if (in.length() < 4) {
+      LOG(ERROR) << "ConfigValue - Byte array needs at least one byte";
+      return false;
+    }
     type_ = BYTES;
     return parseBytesString(in.substr(1, in.length() - 2), value_bytes_);
   }
@@ -128,14 +153,21 @@ bool ConfigValue::parseFromString(std::string in) {
 }
 
 void ConfigFile::addConfig(const std::string& key, ConfigValue& value) {
-  CHECK(!hasKey(key));
-  values_.emplace(key, value);
+  if (hasKey(key)) {
+    LOG(WARNING) << "ConfigFile - Duplicate key found, overwriting: " << key;
+    values_[key] = value;
+  } else {
+    values_.emplace(key, value);
+  }
 }
 
 void ConfigFile::parseFromFile(const std::string& file_name) {
   string config;
   bool config_read = ReadFileToString(file_name, &config);
-  CHECK(config_read);
+  if (!config_read) {
+    LOG(ERROR) << "ConfigFile - Failed to read file: " << file_name;
+    return;
+  }
   LOG(INFO) << "ConfigFile - Parsing file '" << file_name << "'";
   parseFromString(config);
 }
@@ -146,8 +178,8 @@ void ConfigFile::parseFromString(const std::string& config) {
   while (getline(ss, line)) {
     line = Trim(line);
     if (line.empty()) continue;
-    if (line.at(0) == '#') continue;
-    if (line.at(0) == 0) continue;
+    if (line[0] == '#') continue;
+    if (line[0] == 0) continue;
 
     auto search = line.find('=');
     if (search == string::npos) {
@@ -156,12 +188,28 @@ void ConfigFile::parseFromString(const std::string& config) {
       continue;
     }
 
+    // Safeguard substr calls
+    if (search >= line.length()) {
+      LOG(ERROR) << "ConfigFile - Invalid key position in line: " << line;
+      continue;
+    }
+    
     string key(Trim(line.substr(0, search)));
-    string value_string(Trim(line.substr(search + 1, string::npos)));
+    
+    // Check if there's a value after '='
+    if (search + 1 >= line.length()) {
+      LOG(WARNING) << "ConfigFile - Empty value for key: " << key;
+      continue;
+    }
+    
+    string value_string(Trim(line.substr(search + 1)));
 
     ConfigValue value;
     bool value_parsed = value.parseFromString(value_string);
-    CHECK(value_parsed);
+    if (!value_parsed) {
+      LOG(ERROR) << "ConfigFile - Failed to parse value for key: " << key << ", value: " << value_string;
+      continue;
+    }
     addConfig(key, value);
 
     LOG(INFO) << "ConfigFile - [" << key << "] = " << value_string;
@@ -174,7 +222,12 @@ bool ConfigFile::hasKey(const std::string& key) {
 
 ConfigValue& ConfigFile::getValue(const std::string& key) {
   auto search = values_.find(key);
-  CHECK(search != values_.end());
+  if (search == values_.end()) {
+    LOG(ERROR) << "ConfigFile - Key not found: " << key;
+    // Return a static default value to avoid crashes
+    static ConfigValue default_value(0u);
+    return default_value;
+  }
   return search->second;
 }
 

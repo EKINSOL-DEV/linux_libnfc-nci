@@ -24,10 +24,18 @@ std::vector<std::string> android::base::Split(const std::string& s, const std::s
 	std::string str(s);
 	std::string  token(delimiters);
 	while (str.size()) {
-		unsigned int index = str.find(token);
+		size_t index = str.find(token);
 		if (index != std::string::npos) {
-			result.push_back(str.substr(0, index));
-			str = str.substr(index + token.size());
+			// Safeguard substr calls
+			if (index <= str.length()) {
+				result.push_back(str.substr(0, index));
+			}
+			// Check bounds before second substr
+			if (index + token.size() <= str.length()) {
+				str = str.substr(index + token.size());
+			} else {
+				str = "";
+			}
 			if (str.size() == 0)result.push_back(str);
 		}
 		else {

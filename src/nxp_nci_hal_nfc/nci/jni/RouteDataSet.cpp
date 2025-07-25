@@ -59,14 +59,23 @@ AidBuffer::AidBuffer(std::string& aid) : mBuffer(NULL), mBufferLen(0) {
   while (true) {
     num = 0;
     if (pos2 == std::string::npos) {
-      sscanf(aid.substr(pos1).c_str(), "%x", &num);
-      mBuffer[mBufferLen] = (uint8_t)num;
-      mBufferLen++;
+      // Safeguard substr call
+      if (pos1 < aid.length()) {
+        sscanf(aid.substr(pos1).c_str(), "%x", &num);
+        mBuffer[mBufferLen] = (uint8_t)num;
+        mBufferLen++;
+      }
       break;
     } else {
-      sscanf(aid.substr(pos1, pos2 - pos1 + 1).c_str(), "%x", &num);
-      mBuffer[mBufferLen] = (uint8_t)num;
-      mBufferLen++;
+      // Safeguard substr call with length parameter
+      if (pos1 < aid.length() && pos2 >= pos1) {
+        size_t len = pos2 - pos1 + 1;
+        if (pos1 + len <= aid.length()) {
+          sscanf(aid.substr(pos1, len).c_str(), "%x", &num);
+          mBuffer[mBufferLen] = (uint8_t)num;
+          mBufferLen++;
+        }
+      }
       pos1 = pos2 + 1;
       pos2 = aid.find_first_of(delimiter, pos1);
     }
