@@ -369,7 +369,7 @@ int nfcManager_setConfig(unsigned char id, unsigned char length, unsigned char* 
 int doWriteT4tData(unsigned char *command, unsigned char *ndef_buffer, int ndef_buffer_length)
 {
     int ret = 0;
-    if (ndef_buffer == NULL || *ndef_buffer_length <= 0) {
+    if (ndef_buffer == NULL || ndef_buffer_length == NULL || *ndef_buffer_length <= 0) {
       NXPLOG_API_E ("%s: invalide buffer!", __FUNCTION__);
       return NFA_STATUS_FAILED;
     }
