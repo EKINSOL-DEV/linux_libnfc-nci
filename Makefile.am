@@ -242,7 +242,7 @@ include_HEADERS = \
 
 INCLUDE_PARAMS :=$(LIBNFC_NCI_INCLUDE:%=-I$(srcdir)/%)
 INCLUDE_PARAMS +=$(HALIMPL_INCLUDE:%=-I$(srcdir)/%)
-INCLUDE_PARAMS +=$(SERVICE_INCLUDE:%=-I$(srcdir)/%)
+INCLUDE_PARAMS +=$(SERVICE_INCLUDE:%=-I$(srcdir)/%) 
 
 libnfc_nci_linux_la_FLAGS =
 
@@ -253,6 +253,7 @@ libnfc_nci_linux_la_FLAGS += -DNDEBUG
 endif
 
 libnfc_nci_linux_la_FLAGS += -pthread -w
+libnfc_nci_linux_la_FLAGS += -lgpiod
 libnfc_nci_linux_la_FLAGS += -DNFC_NXP_NOT_OPEN_INCLUDED=TRUE
 libnfc_nci_linux_la_FLAGS += -DNXP_HW_SELF_TEST
 libnfc_nci_linux_la_FLAGS += -DNXP_NFC_NATIVE_ENABLE_HCE=TRUE
@@ -268,7 +269,6 @@ libnfc_nci_linux_la_FLAGS += -DNXP_NEW_MW_API_COMPATIBILITY
 
 libnfc_nci_linux_la_LIBADD = $(AC_LIBOBJS)
 libnfc_nci_linux_la_LDFLAGS := $(AM_LDFLAGS)
-libnfc_nci_linux_la_LDFLAGS += -shared -pthread -ldl -lrt -fPIC -release 1 -version-info 0:0:0
+libnfc_nci_linux_la_LDFLAGS += -shared -pthread -lgpiod -ldl -lrt -fPIC -release 1 -version-info 0:0:0
 
-nfcDemoApp_LDFLAGS = -pthread -ldl -lrt -lnfc_nci_linux
-
+nfcDemoApp_LDFLAGS = -pthread -lgpiod -ldl -lrt -lnfc_nci_linux

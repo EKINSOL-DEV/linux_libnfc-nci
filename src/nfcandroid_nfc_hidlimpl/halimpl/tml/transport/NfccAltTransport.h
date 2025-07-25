@@ -57,6 +57,9 @@ class NfccAltTransport : public NfccTransport {
   int SemTimedWait();
   void SemPost();
   int Flushdata(void* pDevHandle, uint8_t* pBuffer, int numRead);
+  // To close the GPIOs
+  void close_gpiod(void);
+
   /*****************************************************************************
    **
    ** Function         Reset
