@@ -51,20 +51,28 @@ extern phTmlNfc_Context_t* gpphTmlNfc_Context;
 NFCSTATUS NfccAltI2cTransport::OpenAndConfigure(pphTmlNfc_Config_t pConfig,
                                                 void** pLinkHandle) {
   NXPLOG_TML_D("%s Enter", __func__);
+  printf("DEBUG: OpenAndConfigure called\n");
   NXPLOG_TML_D("phTmlNfc_i2c_open_and_configure Alternative NFC\n");
   NXPLOG_TML_D("NFC - Assign IO pins\n");
   int status_value = -1;
   int Fd = -1;
   // Assign IO pins
+  printf("DEBUG: Calling ConfigurePin()\n");
   status_value = ConfigurePin();
-  if(status_value == -1)
+  printf("DEBUG: ConfigurePin() returned %d\n", status_value);
+  if(status_value == -1) {
+    printf("DEBUG: ConfigurePin failed, returning INVALID_DEVICE\n");
     return NFCSTATUS_INVALID_DEVICE;
+  }
   NXPLOG_TML_D("NFCHW - open I2C bus - %s\n", I2C_BUS);
+  printf("DEBUG: Opening I2C bus %s\n", I2C_BUS);
 
   // I2C bus
   Fd = open(I2C_BUS, O_RDWR | O_NOCTTY);
+  printf("DEBUG: I2C open returned fd=%d\n", Fd);
   if (Fd < 0) {
     NXPLOG_TML_E("Could not open I2C bus '%s' (%s)", I2C_BUS, strerror(errno));
+    printf("DEBUG: I2C open failed: %s\n", strerror(errno));
     Close(NULL);
     return (NFCSTATUS_INVALID_DEVICE);
   }
@@ -103,6 +111,7 @@ NFCSTATUS NfccAltI2cTransport::OpenAndConfigure(pphTmlNfc_Config_t pConfig,
 int NfccAltI2cTransport::Read(void* pDevHandle, uint8_t* pBuffer,
                               int nNbBytesToRead) {
   NXPLOG_TML_D("%s Enter", __func__);
+  printf("DEBUG: I2C Read called, requesting %d bytes\n", nNbBytesToRead);
   int ret_Read;
   int numRead = 0;
   uint16_t totalBtyesToRead = 0;
@@ -141,7 +150,9 @@ int NfccAltI2cTransport::Read(void* pDevHandle, uint8_t* pBuffer,
     return -1;
   } else {
     wait4interrupt();
+    printf("DEBUG: About to read header, expecting %d bytes\n", totalBtyesToRead - numRead);
     ret_Read = read((intptr_t)pDevHandle, pBuffer, totalBtyesToRead - numRead);
+    printf("DEBUG: Header read returned %d bytes\n", ret_Read);
     if (ret_Read > 0) {
       numRead += ret_Read;
     } else if (ret_Read == 0) {
@@ -177,8 +188,10 @@ int NfccAltI2cTransport::Read(void* pDevHandle, uint8_t* pBuffer,
           pBuffer[NORMAL_MODE_LEN_OFFSET] + NORMAL_MODE_HEADER_LEN;
     }
     wait4interrupt();
+    printf("DEBUG: About to read payload, expecting %d bytes\n", totalBtyesToRead - numRead);
     ret_Read = read((intptr_t)pDevHandle, (pBuffer + numRead),
                     totalBtyesToRead - numRead);
+    printf("DEBUG: Payload read returned %d bytes\n", ret_Read);
     if (ret_Read > 0) {
       numRead += ret_Read;
     } else if (ret_Read == 0) {

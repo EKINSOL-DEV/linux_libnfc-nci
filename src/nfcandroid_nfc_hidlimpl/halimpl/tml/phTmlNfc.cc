@@ -81,6 +81,7 @@ NFCSTATUS phTmlNfc_Init(pphTmlNfc_Config_t pConfig) {
   NFCSTATUS wInitStatus = NFCSTATUS_SUCCESS;
 
    NXPLOG_TML_D("phTmlNfc_Init Entry......  \n");
+   printf("DEBUG: phTmlNfc_Init called\n");
   /* Check if TML layer is already Initialized */
   if (NULL != gpphTmlNfc_Context) {
     /* TML initialization is already completed */
@@ -164,6 +165,7 @@ NFCSTATUS phTmlNfc_Init(pphTmlNfc_Config_t pConfig) {
   }
 
   NXPLOG_TML_D("phTmlNfc_Init exit wInitStatus=%d \n",wInitStatus);
+  printf("DEBUG: phTmlNfc_Init returning status=%d\n", wInitStatus);
   return wInitStatus;
 }
 

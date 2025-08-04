@@ -46,7 +46,7 @@ extern phTmlNfc_i2cfragmentation_t fragmentation_enabled;
 extern phTmlNfc_Context_t* gpphTmlNfc_Context;
 
 //NXP Test new Raspberry pi os
-const char *chipname = "gpiochip4";
+const char *chipname = "gpiochip0";
 struct gpiod_chip *chip;
 struct gpiod_line *VEN_line;
 struct gpiod_line *IRQ_line;
@@ -118,10 +118,12 @@ int NfccAltTransport::NfccReset(void* pDevHandle, NfccResetType eType) {
   }
   switch (eType) {
     case MODE_POWER_OFF:
+      printf("DEBUG: NfccReset MODE_POWER_OFF\n");
       gpio_set_fwdl(0);
       gpio_set_ven(0);
       break;
     case MODE_POWER_ON:
+      printf("DEBUG: NfccReset MODE_POWER_ON\n");
       gpio_set_fwdl(0);
       gpio_set_ven(1);
       break;
@@ -404,10 +406,11 @@ int NfccAltTransport::verifyPin(int pin, int isoutput, int edge) {
 }
 void NfccAltTransport::gpio_set_ven(int value) {
 //NXP Test new Raspberry pi os
+    printf("DEBUG: gpio_set_ven(%d) -> GPIO9=%d\n", value, value == 0 ? 1 : 0);
     if (value == 0) {
-        gpiod_line_set_value(VEN_line, 0);
+        gpiod_line_set_value(VEN_line, 1);  // Inverted: 0 -> 1
     } else {
-        gpiod_line_set_value(VEN_line, 1);
+        gpiod_line_set_value(VEN_line, 0);  // Inverted: 1 -> 0
     }
     usleep(10 * 1000);
 //NXP End Test new Raspberry pi os
@@ -416,6 +419,7 @@ void NfccAltTransport::gpio_set_ven(int value) {
 
 void NfccAltTransport::gpio_set_fwdl(int value) {
 //NXP Test new Raspberry pi os
+    printf("DEBUG: gpio_set_fwdl(%d) -> GPIO8=%d\n", value, value);
     if (value == 0) {
         gpiod_line_set_value(FWDNLD_line, 0);
     } else {
@@ -428,7 +432,16 @@ void NfccAltTransport::gpio_set_fwdl(int value) {
 
 void NfccAltTransport::wait4interrupt(void) {
   //NXP Test new Raspberry pi os
-      while(gpiod_line_get_value(IRQ_line) != 1){};
+      printf("DEBUG: wait4interrupt() called, IRQ pin state = %d\n", gpiod_line_get_value(IRQ_line));
+      int timeout = 1000; // 1 second timeout
+      while(gpiod_line_get_value(IRQ_line) != 1 && timeout-- > 0) {
+        usleep(1000); // 1ms delay
+      };
+      if (timeout <= 0) {
+        printf("DEBUG: wait4interrupt() TIMEOUT - IRQ pin never went high\n");
+      } else {
+        printf("DEBUG: wait4interrupt() completed, IRQ pin went high\n");
+      }
   //NXP End Test new Raspberry pi os
 }
 
@@ -460,7 +473,7 @@ void NfccAltTransport::wait4interrupt(void) {
        FWDNLD_line = gpiod_chip_get_line(chip, PIN_FWDNLD);
    
        gpiod_line_request_output(VEN_line, "VEN pin", 1);
-       gpiod_line_request_output(FWDNLD_line, "FWDNLD pin", 1);
+       gpiod_line_request_output(FWDNLD_line, "FWDNLD pin", 0);
        gpiod_line_request_input(IRQ_line, "IRQ pin");
    //NXP End Test new Raspberry pi os
        return NFCSTATUS_SUCCESS;

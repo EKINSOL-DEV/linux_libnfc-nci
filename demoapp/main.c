@@ -2135,6 +2135,33 @@ int CleanEnv()
  
 int main(int argc, char ** argv)
 {
+    int i;
+    
+    // Parse global options first
+    for (i = 1; i < argc; i++)
+    {
+        if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--i2c-bus") == 0)
+        {
+            if (i + 1 < argc)
+            {
+                setenv("NFC_I2C_BUS", argv[i + 1], 1);
+                // Remove processed arguments by shifting array
+                for (int j = i; j < argc - 2; j++)
+                {
+                    argv[j] = argv[j + 2];
+                }
+                argc -= 2;
+                i--; // Recheck current position
+            }
+            else
+            {
+                printf("Error: -i/--i2c-bus requires a device path\n");
+                help(0x00);
+                return 1;
+            }
+        }
+    }
+    
     if (argc<2)
     {
         printf("Missing argument\n");

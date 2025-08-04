@@ -21,13 +21,14 @@
 #include <linux/i2c-dev.h>
 #include <linux/i2c.h>
 #include <poll.h>
+#include <stdlib.h>
 
 #define I2C_ADDRESS 0x28
-#define I2C_BUS "/dev/i2c-1"
+#define I2C_BUS "/dev/i2c-4"
 #define SPI_BUS "/dev/spidev0.0"
-#define PIN_INT 23
-#define PIN_ENABLE 24
-#define PIN_FWDNLD 25
+#define PIN_INT 25
+#define PIN_ENABLE 9
+#define PIN_FWDNLD 8
 #define EDGE_NONE 0
 #define EDGE_RISING 1
 #define EDGE_FALLING 2
