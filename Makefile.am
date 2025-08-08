@@ -183,6 +183,7 @@ HALIMPL_SOURCE := \
 	src/nfcandroid_nfc_hidlimpl/halimpl/tml/transport/NfccI2cTransport.cc \
 	src/nfcandroid_nfc_hidlimpl/halimpl/tml/transport/NfccAltI2cTransport.cc \
 	src/nfcandroid_nfc_hidlimpl/halimpl/tml/transport/NfccAltSpiTransport.cc \
+	src/nfcandroid_nfc_hidlimpl/halimpl/tml/transport/NfccUsbSerialTransport.cc \
 	src/nfcandroid_nfc_hidlimpl/halimpl/tml/transport/NfccAltTransport.cc \
 	src/nfcandroid_nfc_hidlimpl/halimpl/tml/transport/NfccTransport.cc
 

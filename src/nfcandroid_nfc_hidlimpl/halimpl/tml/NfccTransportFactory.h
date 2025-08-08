@@ -23,7 +23,7 @@
 #define transportFactory (NfccTransportFactory::getInstance())
 typedef std::shared_ptr<NfccTransport> spTransport;
 #ifdef LINUX
-enum transportIntf { I2C, SPI, ALT_I2C, ALT_SPI, UNKNOWN };
+enum transportIntf { I2C, SPI, ALT_I2C, ALT_SPI, USB_SERIAL_BRIDGE, UNKNOWN };
 #else
 enum transportIntf { I2C, SPI, UNKNOWN };
 #endif

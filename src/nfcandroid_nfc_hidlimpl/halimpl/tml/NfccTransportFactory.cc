@@ -19,6 +19,7 @@
 #include <NfccI2cTransport.h>
 #include <NfccAltI2cTransport.h>
 #include <NfccAltSpiTransport.h>
+#include <NfccUsbSerialTransport.h>
 
 #include <NfccTransportFactory.h>
 #include <phNxpLog.h>
@@ -75,6 +76,9 @@ spTransport NfccTransportFactory::getTransport(transportIntf transportType) {
       break;
     case ALT_SPI:
       mspTransportInterface = std::make_shared<NfccAltSpiTransport>();
+      break;
+    case USB_SERIAL_BRIDGE:
+      mspTransportInterface = std::make_shared<NfccUsbSerialTransport>();
       break;
     default:
       mspTransportInterface = std::make_shared<NfccI2cTransport>();
